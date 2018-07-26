@@ -1,13 +1,16 @@
 package org.qa.userproducerapp;
 
+import com.google.gson.Gson;
 import org.qa.userproducerapp.dal.UserRepository;
 import org.qa.userproducerapp.model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -26,6 +29,14 @@ public class UserDataController {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private Gson gson;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+
+
+
     @RequestMapping("/user/all")
     public List<User> getAll() {
         log.info("getting all users. total {}", userRepository.count());
@@ -35,7 +46,7 @@ public class UserDataController {
     }
 
     @RequestMapping("/user/save")
-    public User save(@RequestBody User user) {
+    public User save(@RequestBody User user){
         log.info("adding a new user: {}", user.toString());
 
         UserDataController control = new UserDataController();
@@ -50,6 +61,7 @@ public class UserDataController {
             user.setId(id);
         }
         else {
+            rabbitTemplate.convertAndSend(UserApplication.topicExchangeName, "foo.bar.baz", gson.toJson(user));
             return userRepository.save(user);
         }
         return save(user);
@@ -71,8 +83,8 @@ public class UserDataController {
             HttpURLConnection con = (HttpURLConnection) obj.openConnection();
             con.setRequestMethod("GET");
             int responseCode = con.getResponseCode();
-            System.out.println("\nSending GET request to URL:" + url);
-            System.out.println("Response Code:" + responseCode);
+            log.info("\nSending GET request to URL:" + url);
+            log.info("Response Code:" + responseCode);
             in = new BufferedReader(
                     new InputStreamReader(con.getInputStream()));
 
@@ -87,7 +99,7 @@ public class UserDataController {
         } catch (IOException el){
             el.printStackTrace();
         }
-        System.out.println(response.toString());
+        log.info(response.toString());
         return response.toString();
 
     }
